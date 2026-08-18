@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MADRA</title>
+    
+    <!-- 1. Loquix Component Library -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/loquix@latest/dist/loquix.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/loquix@latest/dist/theme.css">
+    
+    <!-- 2. Marked.js for parsing Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #172554 50%, #1e1b4b 100%);
+            background-attachment: fixed;
+            color: #fafafa;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 800px;
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(to right, #60a5fa, #c084fc);
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 5px;
+        }
+        .header p {
+            color: #a1a1aa;
+            font-size: 1.1rem;
+        }
+        #chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            margin-bottom: 120px; /* Space for fixed input */
+            flex-grow: 1;
+        }
+        .input-wrapper {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, #1e1b4b 40%);
+            padding: 40px 20px 30px;
+            display: flex;
+            justify-content: center;
+        }
+        .input-box {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 800px;
+            background: rgba(39, 39, 42, 0.5);
+            backdrop-filter: blur(12px);
+            padding: 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: none;
+            background-color: transparent;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+        input[type="text"]::placeholder {
+            color: #71717a;
+        }
+        button {
+            padding: 0 30px;
+            border-radius: 12px;
+            border: none;
+            background-color: #fafafa;
+            color: #09090b;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background-color: #e4e4e7;
+            transform: scale(0.98);
+        }
+        
+        /* Markdown Styling Overrides for Loquix Content */
+        loquix-message-content h1, loquix-message-content h2, loquix-message-content h3 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        loquix-message-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5em 0;
+        }
+        loquix-message-content th, loquix-message-content td {
+            border: 1px solid #3f3f46;
+            padding: 12px;
+            text-align: left;
+        }
+        loquix-message-content th {
+            background-color: #27272a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MADRA</h1>
+            <p>Multi-Agent Deep Research Architecture</p>
+        </div>
+        
+        <div id="chat-container">
+            <!-- Dynamic Loquix messages will be injected here -->
+        </div>
+    </div>
+
+    <div class="input-wrapper">
+        <div class="input-box">
+            <input type="text" id="query-input" placeholder="Compare the box office performance of...">
+            <button onclick="sendQuery()">Research</button>
+        </div>
+    </div>
+
+    <script>
+        async function sendQuery() {
+            const input = document.getElementById('query-input');
+            const query = input.value;
+            if (!query.trim()) return;
+            
+            const chatContainer = document.getElementById('chat-container');
+            
+            // 1. Add User Message
+            chatContainer.innerHTML += `
+                <loquix-message-item role="user">
+                    <loquix-message-content>${query}</loquix-message-content>
+                </loquix-message-item>
+            `;
+            input.value = '';
+            
+            // 2. Add Assistant Streaming Placeholder with Tool Dropdown
+            const msgId = 'msg-' + Date.now();
+            chatContainer.innerHTML += `
+                <loquix-message-item role="assistant" status="streaming" model="gpt-oss-120b" id="${msgId}">
+                    <loquix-message-content id="content-${msgId}">
+                        <i>Consulting Agents...</i>
+                    </loquix-message-content>
+                    
+                    <loquix-tool-call-list slot="below-bubble" id="tools-${msgId}" summary="Initializing Graph...">
+                    </loquix-tool-call-list>
+                </loquix-message-item>
+            `;
+            
+            // Scroll to bottom
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            
+            // 3. Connect to FastAPI SSE Endpoint
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query })
+            });
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            const contentEl = document.getElementById(`content-${msgId}`);
+            const toolsEl = document.getElementById(`tools-${msgId}`);
+            const itemEl = document.getElementById(msgId);
+            
+            toolsEl.setAttribute("open", "true");
+            
+            let toolsList = [];
+            let toolCount = 0;
+            let startTime = Date.now();
+            
+            function renderTools() {
+                let elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
+                toolsEl.setAttribute('summary', `Running... · ${elapsedSeconds}s elapsed`);
+                
+                let html = '';
+                for(let t of toolsList) {
+                    let durAttr = t.duration ? `duration="${t.duration}"` : '';
+                    html += `<loquix-tool-call name="${t.name}" status="${t.status}" result="${t.result}" ${durAttr}></loquix-tool-call>`;
+                }
+                toolsEl.innerHTML = html;
+            }
+            
+            // 4. Read the SSE stream chunks
+            while(true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = JSON.parse(line.replace('data: ', ''));
+                        
+                        // Handle Tool Start (Shows spinning loader)
+                        if (data.type === 'tool_start') {
+                            toolsList.push({
+                                name: data.name,
+                                status: 'running',
+                                result: 'Working...'
+                            });
+                            renderTools();
+                            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                        }
+                        // Handle Tool End (Shows success checkmark)
+                        else if (data.type === 'tool_end') {
+                            toolCount++;
+                            for(let i = toolsList.length - 1; i >= 0; i--) {
+                                if(toolsList[i].status === 'running') {
+                                    toolsList[i].status = data.status;
+                                    toolsList[i].result = 'Completed';
+                                    toolsList[i].duration = data.duration;
+                                    break;
+                                }
+                            }
+                            renderTools();
+                        } 
+                        // Handle Final Report Event
+                        else if (data.type === 'done') {
+                            // Parse the raw markdown into HTML using marked.js
+                            contentEl.innerHTML = marked.parse(data.report);
+                            
+                            // Stop the streaming animation on the Loquix component
+                            itemEl.removeAttribute('status'); 
+                            
+                            if(data.score) {
+                                toolsEl.setAttribute('summary', `Research approved with Quality Score: ${data.score}/10`);
+                            }
+                            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                        }
+                        // Handle Error Event
+                        else if (data.type === 'error') {
+                            contentEl.innerHTML = `**Error:** ${data.message}`;
+                            itemEl.removeAttribute('status');
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Allow pressing Enter to send
+        document.getElementById('query-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                sendQuery();
+            }
+        });
+    </script>
+</body>
+</html>
