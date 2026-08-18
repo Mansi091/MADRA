@@ -14,16 +14,39 @@ class SubQuestions(BaseModel):
 def planner_node(state: ResearchState) -> dict:
     print("PLANNER NODE RUNNING")
     query = state.get("original_query")
+    feedback = state.get("evaluation_feedback", "")
+    evidence = state.get("evidence", [])
     
-    llm = ChatGroq(model="llama-3.1-70b-versatile", temperature=0)
+    compiled_research = ""
+    for ev in evidence:
+        compiled_research += f"\nSub-question: {ev.get('question')}\n"
+        compiled_research += f"Claims Found: {len(ev.get('claims', []))}\n"
+    
+    llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
     structured_llm = llm.with_structured_output(SubQuestions)
     
     prompt = f"""
-    You are a Research Planner. Your job is to break down the following complex query into 2 to 4 distinct sub-questions.
-    These sub-questions will be given to parallel researchers to search the web.
-    Make the questions highly specific and actionable for a search engine.
+    You are an expert Research Planner.
+    Based on the original query and the research gathered so far, generate a list of highly specific sub-questions that need to be answered next.
+    If the gathered research is empty, generate initial sub-questions.
+    If the gathered research is partial, generate follow-up questions to fill the gaps.
+    Generate a maximum of 3 sub-questions.
+    
+    CRITICAL INSTRUCTION: You MUST use the provided tool/function to output your response. 
+    Do NOT output plain text or markdown. Call the tool with the 'sub_questions' field.
     
     Original Query: {query}
+    
+    Gathered Research:
+    {compiled_research}
+    
+    Previous Research:
+    {compiled_research}
+    
+    Previous Evaluation Feedback:
+    {feedback}
+    Focus especially on the missing information identified by the evaluator.
+    Do not repeat questions that have already been sufficiently researched.
     """
     
     result = structured_llm.invoke(prompt)
