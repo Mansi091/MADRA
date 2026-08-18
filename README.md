@@ -1,5 +1,7 @@
 # MADRA: Multi-Agent Deep Research Architecture 🧠
 
+**🟢 Live Demo:** [https://madra-5qwt.onrender.com/](https://madra-5qwt.onrender.com/)
+
 MADRA is a multi-agent research system built with **LangGraph** and **FastAPI**. It uses parallel web scraping, critical analysis, and self-refining report generation to answer complex queries.
 
 ![MADRA UI Preview](https://img.shields.io/badge/UI-Loquix%20Web%20Components-blue?style=for-the-badge)
