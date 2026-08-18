@@ -52,7 +52,7 @@ graph = builder.compile(checkpointer=memory, interrupt_before=["writer"])
 if __name__ == "__main__":
     print("    DEEP RESEARCH AGENT STARTING    ")
     
-    user_query = input("Enter your research query: ")
+    user_query = input("Enter your query: ")
     
     if not user_query.strip():
         user_query = "Compare the impact of AI on the healthcare industry in India from 2020 to 2026."
