@@ -9,4 +9,6 @@ class ResearchState(TypedDict):
     evaluation_feedback: str
     research_iterations: int
     draft_report: str
+    report_critique: str
+    revision_iterations: int
     final_report: str

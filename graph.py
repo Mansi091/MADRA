@@ -7,6 +7,7 @@ from nodes.planner import planner_node
 from nodes.researcher import researcher_node
 from nodes.reflector import reflector_node
 from nodes.writer import writer_node
+from nodes.critic import critic_node
 
 def map_researchers(state: ResearchState):
     return [
@@ -25,12 +26,19 @@ def should_continue(state: ResearchState):
     else:
         return "planner"
 
+def should_finalize(state: ResearchState):
+    if state.get("revision_iterations", 0) >= 1:
+        return END
+    else:
+        return "writer"
+
 builder = StateGraph(ResearchState)
 
 builder.add_node("planner", planner_node)
 builder.add_node("researcher", researcher_node)
 builder.add_node("reflector", reflector_node)
 builder.add_node("writer", writer_node)
+builder.add_node("critic", critic_node)
 
 builder.add_edge(START, "planner")
 builder.add_conditional_edges("planner", map_researchers, ["researcher"])
@@ -43,7 +51,15 @@ builder.add_conditional_edges(
         "writer": "writer"
     }
 )
-builder.add_edge("writer", END)
+builder.add_edge("writer", "critic")
+builder.add_conditional_edges(
+    "critic",
+    should_finalize,
+    {
+        "writer": "writer",
+        END: END
+    }
+)
 
 memory = MemorySaver()
 

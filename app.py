@@ -90,6 +90,20 @@ async def chat_endpoint(req: QueryRequest):
                     }
                     yield f"data: {json.dumps(data)}\n\n"
                     
+                    # Predict next node to yield 'tool_start'
+                    if node_name == 'writer':
+                        current_state = graph.get_state(config)
+                        next_node = current_state.next
+                        if next_node and len(next_node) > 0:
+                            node_start_time = time.time()
+                            yield f"data: {json.dumps({'type': 'tool_start', 'name': next_node[0].capitalize()})}\n\n"
+                    elif node_name == 'critic':
+                        current_state = graph.get_state(config)
+                        next_node = current_state.next
+                        if next_node and len(next_node) > 0:
+                            node_start_time = time.time()
+                            yield f"data: {json.dumps({'type': 'tool_start', 'name': next_node[0].capitalize()})}\n\n"
+                            
             # 5. Fetch the final report
             final_state = graph.get_state(config).values
             final_report = final_state.get('draft_report', 'Failed to generate report.')
